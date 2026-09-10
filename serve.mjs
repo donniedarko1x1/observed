@@ -12,4 +12,4 @@ http.createServer(async(req,res)=>{
     if(!target.startsWith(root+path.sep)){res.writeHead(403);res.end();return;}
     const data=await readFile(target);res.writeHead(200,{'Content-Type':types[path.extname(target)]??'application/octet-stream','X-Content-Type-Options':'nosniff','Cache-Control':'no-cache'});res.end(req.method==='HEAD'?undefined:data);
   }catch{res.writeHead(404);res.end('Not found');}
-}).on('error',error=>{console.error(error.message);process.exitCode=1;}).listen(port,'127.0.0.1',()=>console.log(`OBSERVED 0.14.2 — http://127.0.0.1:${port}\nPress Ctrl+C to stop.`));
+}).on('error',error=>{console.error(error.message);process.exitCode=1;}).listen(port,'127.0.0.1',()=>console.log(`OBSERVED 0.14.3 — http://127.0.0.1:${port}\nPress Ctrl+C to stop.`));
