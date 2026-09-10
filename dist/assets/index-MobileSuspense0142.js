@@ -1114,10 +1114,19 @@ function ti(a) {
     }
 }
 
-function Ae(a) {
-    return [-1.6, 0, 1.6].map((e, t) => ({
-        id: `sound-${t}`,
-        x: e,
+function Ae(a, e = 0) {
+    if (e === 4) {
+        const t = Math.min(1.75, a.size.width / 2 - 1.35);
+        return [-1.65, 0, 1.65].map((i, s) => ({
+            id: `sound-${s}`,
+            x: t,
+            y: 1.25,
+            z: i
+        }))
+    }
+    return [-1.6, 0, 1.6].map((t, i) => ({
+        id: `sound-${i}`,
+        x: t,
         y: 1.25,
         z: a.size.depth / 2 - 3.2
     }))
@@ -2144,7 +2153,7 @@ function HorrorTargetV012(e) {
 
 function Me(a, e, t, i = "OBSERVED", f = null) {
     const s = new B(`${i}|horror-director-v012|${e}|${t}`),
-        o = [0, 0, 2, 4, 10, 10, 3, 12, 8, 5, 16, 10, 30, 6][e] ?? 6,
+        o = [0, 2, 5, 8, 10, 16, 3, 12, 8, 5, 16, 10, 30, 6][e] ?? 6,
         n = [];
     const r = (at, candidates, duration = .8, trigger = "time", bias = .12, forced = !1) => n.push({
         at,
@@ -2164,18 +2173,19 @@ function Me(a, e, t, i = "OBSERVED", f = null) {
         u = s.int(-18, 18) / 10;
     switch (e) {
         case 1:
+            r(s.int(2, 4), ["impact", "camera_led"], .18, "time", .7, !0);
             break;
         case 2:
-            r(s.int(15, 23), ["impact", "step"], .14, "time", -.02);
+            r(s.int(6, 9), ["impact"], .16, "time", .7, !0), r(s.int(14, 17), ["step"], .22, "time", .65, !0);
             break;
         case 3:
-            r(s.int(14, 22), ["window", "false_observer", "impact"], s.int(9, 15) / 10, "time", -.09);
+            r(s.int(4, 6), ["lightdip"], .55, "time", .7, !0), r(s.int(8, 11), ["window", "false_observer"], s.int(12, 17) / 10, "time", .7, !0);
             break;
         case 4:
-            r(s.int(11, 18), ["window", "false_observer", "camera_led"], s.int(11, 18) / 10, "time", .11);
+            r(s.int(3, 5), ["camera_led"], .32, "time", .7, !0), r(s.int(9, 13), ["window", "false_observer"], s.int(13, 19) / 10, "time", .72, !0);
             break;
         case 5:
-            r(s.int(9, 15), ["stutter", "lightdip", "fixture_off"], .7, "time", .02), r(4, ["blackout", "blackout_prop", "blackout_observer"], s.int(9, 15) / 10, "provoked", .02);
+            r(s.int(3, 5), ["stutter", "fixture_off"], .7, "time", .72, !0), r(s.int(9, 12), ["blackout_observer"], s.int(12, 17) / 10, "time", .86, !0);
             break;
         case 6:
             r(s.int(16, 24), ["silence"], s.int(22, 34) / 10, "time", -.16);
@@ -2886,7 +2896,7 @@ class st {
     locateSource(e) {
         const t = this.runtime.definition.soundVariant;
         if (!t || this.runtime.state.flags.sourceFound) return;
-        const i = Ae(this.campaign.room()).findIndex(s => s.id === e);
+        const i = Ae(this.campaign.room(), this.campaign.state.index).findIndex(s => s.id === e);
         i < 0 || (this.interact(e, "sound", i === t.sourceIndex ? "source" : "wrong-source"), i === t.sourceIndex && this.resolve("EXPLORE"))
     }
     observe(e) {
@@ -3793,8 +3803,8 @@ class yi {
             const v = new Ve({
                 map: this.assets.sign(["FORECAST", "PENDING"], 1024, 512, "#b8d3ba", "#07100d"),
                 transparent: !1
-            });
-            this.materials.push(v), this.predictionScreen = new K(new Qe(2.45, 1.18), v), this.predictionScreen.position.set(-o / 2 + .12, 1.95, .15), this.predictionScreen.rotation.y = Math.PI / 2, this.scene.add(this.predictionScreen), this.box(2.62, 1.35, .1, -o / 2 + .06, 1.95, .15, m)
+            }), boardZ = t.soundVariant ? -Math.min(1.95, n / 2 - 1.55) : .15;
+            this.materials.push(v), this.predictionScreen = new K(new Qe(2.45, 1.18), v), this.predictionScreen.position.set(-o / 2 + .12, 1.95, boardZ), this.predictionScreen.rotation.y = Math.PI / 2, this.scene.add(this.predictionScreen), this.box(2.62, 1.35, .1, -o / 2 + .06, 1.95, boardZ, m)
         }
         if ([7, 12].includes(i)) {
             const v = this.solid("#020504", "#0a1711", .01);
@@ -3855,7 +3865,7 @@ class yi {
             }), p.solid && this.collision.add(p.id, p.x, p.z, p.width, p.depth)
         }
         if (t.soundVariant)
-            for (const [p, O] of Ae(s).entries()) {
+            for (const [p, O] of Ae(s, i).entries()) {
                 const v = new W;
                 v.position.set(O.x, 0, O.z), this.scene.add(v), this.tag(v, {
                     id: O.id,
@@ -4226,7 +4236,7 @@ class vi {
 }
 class xi {
     constructor(e, t, i, s, o) {
-        this.model = t, this.seed = i, this.experiment = s, this.diagnostics = o, this.element = document.createElement("section"), this.element.id = "debug", this.element.hidden = !0, this.element.innerHTML = `<header><span class="eyebrow">OBSERVED / DIAGNOSTICS</span><h2>Behavior laboratory</h2><span class="muted">Симуляция приостановлена · F2 — вернуться</span></header><nav>${["Overview","Context","Patterns","Horror","Events"].map(n=>`<button data-tab="${n}">${n}</button>`).join("")}</nav><div id="debug-body"></div><footer><button id="export-profile">Экспорт профиля и событий</button><span>v0.14.1 MODEL BREAK · local only</span></footer>`, e.append(this.element), this.element.querySelectorAll("[data-tab]").forEach(n => n.onclick = () => {
+        this.model = t, this.seed = i, this.experiment = s, this.diagnostics = o, this.element = document.createElement("section"), this.element.id = "debug", this.element.hidden = !0, this.element.innerHTML = `<header><span class="eyebrow">OBSERVED / DIAGNOSTICS</span><h2>Behavior laboratory</h2><span class="muted">Симуляция приостановлена · F2 — вернуться</span></header><nav>${["Overview","Context","Patterns","Horror","Events"].map(n=>`<button data-tab="${n}">${n}</button>`).join("")}</nav><div id="debug-body"></div><footer><button id="export-profile">Экспорт профиля и событий</button><span>v0.14.2 MOBILE SUSPENSE · local only</span></footer>`, e.append(this.element), this.element.querySelectorAll("[data-tab]").forEach(n => n.onclick = () => {
             this.tab = n.dataset.tab, this.render()
         }), this.element.querySelector("#export-profile").onclick = () => {
             const n = this.model(),
@@ -4344,7 +4354,7 @@ class xi {
 const ce = document.querySelector("#app");
 ce.innerHTML = `<div id="hud"><div id="hud-top"><span id="experiment-id">OBS / EXPERIMENT 001</span><span><i id="record"></i>OBSERVATION ACTIVE</span></div><div id="system-message"></div><div id="crosshair"></div><div id="prompt"></div><div id="hint">WASD · МЫШЬ · E ВЗАИМОДЕЙСТВИЕ · F ФОНАРЬ · F2 ПРОФИЛЬ · ESC ПАУЗА</div><div id="stats"></div></div>
 <div id="transition" aria-hidden="true"></div>
-<section id="menu"><span class="eyebrow">DEPARTMENT OF BEHAVIORAL SYSTEMS</span><h1>OBSERVED</h1><span class="eyebrow">ENGINE 0.14.1 / MODEL BREAK</span><div class="bar"></div><p class="intro">Тринадцать помещений. Один активный пропуск.<br>Следуйте указаниям внутри комплекса.</p><div class="controls"><b>W A S D</b><span>Движение · Shift — быстрее</span><b>C</b><span>Присесть · двигаться тише</span><b>МЫШЬ / ↑↓←→</b><span>Осмотреться</span><b>E / F</b><span>Взаимодействовать / фонарь</span><b>F2 / Esc</b><span>Профиль поведения / пауза</span></div><div class="menu-buttons"><button id="enter">ВОЙТИ В КОМНАТУ →</button><button id="save" class="secondary">СОХРАНИТЬ</button><button id="load" class="secondary">ЗАГРУЗИТЬ</button></div><div id="seed-row"><label for="seed">SEED</label><input id="seed" type="text" maxlength="128" value="OBSERVED-001" spellcheck="false"><button id="new" class="secondary">НОВЫЙ ТЕСТ</button></div><div class="settings"><label><input id="mute" type="checkbox">Без звука</label><label><input id="flicker" type="checkbox">Меньше мерцания</label><label><input id="invert" type="checkbox">Инверсия Y</label><label>Рендер <select id="resolution"><option value="180">180p</option><option selected value="270">270p</option><option value="360">360p</option></select></label></div><p id="menu-status" role="status"></p><span id="build-tag">MODEL BREAK · 0.14.1</span></section>
+<section id="menu"><span class="eyebrow">DEPARTMENT OF BEHAVIORAL SYSTEMS</span><h1>OBSERVED</h1><span class="eyebrow">ENGINE 0.14.2 / MOBILE SUSPENSE</span><div class="bar"></div><p class="intro">Тринадцать помещений. Один активный пропуск.<br>Следуйте указаниям внутри комплекса.</p><div class="controls"><b>W A S D</b><span>Движение · Shift — быстрее</span><b>C</b><span>Присесть · двигаться тише</span><b>МЫШЬ / ↑↓←→</b><span>Осмотреться</span><b>E / F</b><span>Взаимодействовать / фонарь</span><b>F2 / Esc</b><span>Профиль поведения / пауза</span></div><div class="menu-buttons"><button id="enter">ВОЙТИ В КОМНАТУ →</button><button id="save" class="secondary">СОХРАНИТЬ</button><button id="load" class="secondary">ЗАГРУЗИТЬ</button></div><div id="seed-row"><label for="seed">SEED</label><input id="seed" type="text" maxlength="128" value="OBSERVED-001" spellcheck="false"><button id="new" class="secondary">НОВЫЙ ТЕСТ</button></div><div class="settings"><label><input id="mute" type="checkbox">Без звука</label><label><input id="flicker" type="checkbox">Меньше мерцания</label><label><input id="invert" type="checkbox">Инверсия Y</label><label>Рендер <select id="resolution"><option value="180">180p</option><option selected value="270">270p</option><option value="360">360p</option></select></label></div><p id="menu-status" role="status"></p><span id="build-tag">MOBILE SUSPENSE · 0.14.2</span></section>
 <section id="complete" hidden><article><span class="eyebrow">IDENTITY DISPOSITION</span><h2 id="completion-title">Последовательность завершена.</h2><p id="completion-copy">Результат модели рассчитан.</p><pre id="handoff"></pre><button id="review">ИССЛЕДОВАТЬ ПРОФИЛЬ · F2</button><button id="back-menu" class="secondary">МЕНЮ</button></article></section>`;
 const f = a => document.getElementById(a);
 ce.insertAdjacentHTML("beforeend", '<div id="dread" aria-hidden="true"></div><section id="caught" hidden><article><span class="eyebrow">RECORDING INTERRUPTED</span><h2>В комнате было двое.</h2><p>Система сохранила только одну запись.</p><button id="retry">ВОССТАНОВИТЬ ЗАПИСЬ КОМНАТЫ</button></article></section>');
@@ -4688,8 +4698,10 @@ function Ti(a) {
     if (!w) return;
     A.render(w.scene), Oe += (1 / Math.max(.001, a) - Oe) * .03, Se += a;
     const e = re.target,
-        t = h.threat.phase === "door_relock" || h.campaign.state.index === 13 && !h.fear.reportComplete;
-    f("hint").textContent = h.runtime.state.power?.location === "hand" ? "ПРЕДОХРАНИТЕЛЬ В РУКАХ · E ВСТАВИТЬ · G ПОЛОЖИТЬ" : "WASD · SHIFT БЕГ · C ПРИСЕСТЬ · E ДЕЙСТВИЕ · F ФОНАРЬ · F2 ПРОФИЛЬ · ESC ПАУЗА", f("prompt").textContent = j.paused || Q ? "" : e?.action === "door" ? t ? "ДВЕРЬ ВРЕМЕННО ЗАБЛОКИРОВАНА" : w.targetOpen ? "ДВЕРЬ ОТКРЫТА" : h.runtime.unlocked ? "E  ·  ОТКРЫТЬ ДВЕРЬ" : "ДВЕРЬ ЗАБЛОКИРОВАНА" : e ? re.actionable || e.action === "inspect" ? e.label : "ПОДОЙДИТЕ БЛИЖЕ" : "", f("hud").style.opacity = j.paused ? "0" : "1", Se > .5 && (f("stats").textContent = `${Math.round(Oe)} FPS / ${A.draws} DRAWS / ${A.triangles} TRI`, Se = 0)
+        t = h.threat.phase === "door_relock" || h.campaign.state.index === 13 && !h.fear.reportComplete,
+        i = j.paused || Q ? "" : e?.action === "door" ? t ? "ДВЕРЬ ВРЕМЕННО ЗАБЛОКИРОВАНА" : w.targetOpen ? "ДВЕРЬ ОТКРЫТА" : h.runtime.unlocked ? "E  ·  ОТКРЫТЬ ДВЕРЬ" : "ДВЕРЬ ЗАБЛОКИРОВАНА" : e ? re.actionable || e.action === "inspect" ? e.label : "ПОДОЙДИТЕ БЛИЖЕ" : "",
+        s = f("prompt");
+    f("hint").textContent = h.runtime.state.power?.location === "hand" ? "ПРЕДОХРАНИТЕЛЬ В РУКАХ · E ВСТАВИТЬ · G ПОЛОЖИТЬ" : "WASD · SHIFT БЕГ · C ПРИСЕСТЬ · E ДЕЙСТВИЕ · F ФОНАРЬ · F2 ПРОФИЛЬ · ESC ПАУЗА", s.textContent = i, s.classList.toggle("instruction-copy", hasTouchInput() && e?.id === "instruction" && !!i), f("hud").style.opacity = j.paused ? "0" : "1", Se > .5 && (f("stats").textContent = `${Math.round(Oe)} FPS / ${A.draws} DRAWS / ${A.triangles} TRI`, Se = 0)
 }
 
 function q(a = !0) {
@@ -4826,7 +4838,7 @@ ye(Z);
 A.renderer.setAnimationLoop(j.frame);
 
 
-/* OBSERVED 0.14.1 — adaptive mobile input layer */
+/* OBSERVED 0.14.2 — adaptive mobile input layer */
 const mobileInputQuery = window.matchMedia("(pointer: coarse)");
 const hasTouchInput = () => mobileInputQuery.matches || (navigator.maxTouchPoints || 0) > 0;
 const mobileControls = document.createElement("div");
@@ -4955,7 +4967,7 @@ lookZone.addEventListener("pointermove", e => {
     if (e.pointerId !== mobileState.lookPointer || !C.active || j.paused) return;
     const dx = e.clientX - mobileState.lastLookX, dy = e.clientY - mobileState.lastLookY;
     mobileState.lastLookX = e.clientX; mobileState.lastLookY = e.clientY;
-    const sensitivity = matchMedia("(orientation: portrait)").matches ? 1.15 : 1.0;
+    const sensitivity = matchMedia("(orientation: portrait)").matches ? 1.85 : 1.65;
     C.dx += dx * sensitivity; C.dy += dy * sensitivity;
     e.preventDefault();
 });
