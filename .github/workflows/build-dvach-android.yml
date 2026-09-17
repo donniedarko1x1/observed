@@ -3,7 +3,7 @@ name: Build Dvach Neo APK
 on:
   push:
     branches:
-      - ai/dvach-v0.8
+      - ai/dvach-v0.8.1
   workflow_dispatch:
 
 jobs:
@@ -23,18 +23,16 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Apply v0.8 synchronized media viewer patch
+      - name: Apply v0.8.1 post sharing patch
         working-directory: dvach-android
-        run: |
-          python3 apply_v08.py
-          python3 apply_v08_fix.py
+        run: python3 apply_v081.py
       - name: Build debug APK
         working-directory: dvach-android
         run: gradle --no-daemon assembleDebug
       - name: Prepare artifact
-        run: cp dvach-android/app/build/outputs/apk/debug/app-debug.apk dvach-neo-v0.8.0.apk
+        run: cp dvach-android/app/build/outputs/apk/debug/app-debug.apk dvach-neo-v0.8.1.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: dvach-neo-v0.8-apk
-          path: dvach-neo-v0.8.0.apk
+          name: dvach-neo-v0.8.1-apk
+          path: dvach-neo-v0.8.1.apk
           if-no-files-found: error
