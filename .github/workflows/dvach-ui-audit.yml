@@ -42,29 +42,34 @@ jobs:
             adb install -r dvach-android/app/build/outputs/apk/debug/app-debug.apk
             adb shell am force-stop su.dvach.neo
             adb shell monkey -p su.dvach.neo -c android.intent.category.LAUNCHER 1
-            sleep 8
+            sleep 7
+            # GitHub's cold-boot Pixel launcher sometimes ANRs behind the app; dismiss its Wait dialog if present.
+            adb shell input tap 540 1360 || true
+            sleep 2
+            adb exec-out screencap -p > audit/01-boards-clean.png
             adb shell uiautomator dump /sdcard/boards.xml || true
             adb pull /sdcard/boards.xml audit/boards.xml || true
-            adb exec-out screencap -p > audit/01-boards.png
             adb logcat -d -v time > audit/logcat-boards.txt
-            adb shell input tap 540 520
+            # First fallback board (/b/) row.
+            adb shell input tap 540 455
             sleep 8
+            adb exec-out screencap -p > audit/02-catalog.png
             adb shell uiautomator dump /sdcard/catalog.xml || true
             adb pull /sdcard/catalog.xml audit/catalog.xml || true
-            adb exec-out screencap -p > audit/02-after-board-tap.png
             adb logcat -d -v time > audit/logcat-catalog.txt
-            adb shell input tap 540 650
+            # First visible catalog card.
+            adb shell input tap 540 360
             sleep 8
+            adb exec-out screencap -p > audit/03-thread.png
             adb shell uiautomator dump /sdcard/thread.xml || true
             adb pull /sdcard/thread.xml audit/thread.xml || true
-            adb exec-out screencap -p > audit/03-after-thread-tap.png
             adb shell input swipe 540 1750 540 450 500
             sleep 2
-            adb exec-out screencap -p > audit/04-scrolled.png
+            adb exec-out screencap -p > audit/04-thread-scrolled.png
             adb logcat -d -v time > audit/logcat-final.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: dvach-ui-audit
+          name: dvach-ui-audit-clean
           path: audit
           if-no-files-found: warn
