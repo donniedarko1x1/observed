@@ -68,7 +68,9 @@ private fun ZoomableImage(url: String, imageLoader: ImageLoader) {
                                         (offset.y + pan.y * factor).coerceIn(-size.height * 2f, size.height * 2f)
                                     )
                                 }
-                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                                event.changes.forEach {
+                                    if (it.position != it.previousPosition) it.consume()
+                                }
                             }
                         } else {
                             val change = event.changes.firstOrNull()
