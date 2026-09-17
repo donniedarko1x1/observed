@@ -1,7 +1,8 @@
 from pathlib import Path
 
-# Materialize the complete working v0.8 first.
+# Materialize the complete working v0.8 first, including its compatibility fix.
 exec(Path('apply_v08.py').read_text(encoding='utf-8'), {'__name__': '__main__'})
+exec(Path('apply_v08_fix.py').read_text(encoding='utf-8'), {'__name__': '__main__'})
 
 # Bump version.
 build = Path('app/build.gradle')
