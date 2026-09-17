@@ -27,22 +27,18 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p = Path('dvach-android/app/src/main/java/su/dvach/neo/DvachUi.kt')
           s = p.read_text(encoding='utf-8')
           s = s.replace('import androidx.compose.material3.DarkColorScheme\n', '')
           s = s.replace('import androidx.compose.runtime.rememberSaveable\n', 'import androidx.compose.runtime.saveable.rememberSaveable\n')
           s = s.replace('import androidx.compose.runtime.rememberSaveableStateHolder\n', 'import androidx.compose.runtime.saveable.rememberSaveableStateHolder\n')
           s = s.replace('private val AppColors: DarkColorScheme = darkColorScheme(', 'private val AppColors = darkColorScheme(')
-          old = '''CookieManager.getInstance().apply {
-                            setAcceptCookie(true)
-                            setAcceptThirdPartyCookies(this@apply.let { this@apply as? WebView } ?: this@apply, true)
-                        }'''
-          new = '''val cookies = CookieManager.getInstance()
-                        cookies.setAcceptCookie(true)
-                        cookies.setAcceptThirdPartyCookies(this, true)'''
-          if old not in s:
-              raise SystemExit('CookieManager patch target not found')
-          s = s.replace(old, new)
+          pattern = r'CookieManager\.getInstance\(\)\.apply\s*\{\s*setAcceptCookie\(true\)\s*setAcceptThirdPartyCookies\([^\n]+\)\s*\}'
+          replacement = 'val cookies = CookieManager.getInstance()\n                        cookies.setAcceptCookie(true)\n                        cookies.setAcceptThirdPartyCookies(this, true)'
+          s, count = re.subn(pattern, replacement, s, count=1, flags=re.MULTILINE)
+          if count != 1:
+              raise SystemExit(f'CookieManager patch count: {count}')
           p.write_text(s, encoding='utf-8')
           PY
       - name: Build debug APK
