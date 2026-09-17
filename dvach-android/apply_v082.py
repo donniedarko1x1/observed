@@ -14,7 +14,7 @@ ui = Path('app/src/main/java/su/dvach/neo/DvachUi.kt')
 s = ui.read_text(encoding='utf-8')
 
 start = s.find('@Composable\nprivate fun HtmlPostText(')
-end = s.find('\nprivate fun extractReplyTargets', start)
+end = s.find('\n@OptIn(ExperimentalFoundationApi::class)\n@Composable\nprivate fun MediaViewer(', start)
 if start < 0 or end < 0:
     raise SystemExit('HtmlPostText/makeRichText block markers not found')
 
