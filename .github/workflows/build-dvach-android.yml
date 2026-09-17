@@ -1,0 +1,33 @@
+name: Build Dvach Neo APK
+
+on:
+  push:
+    branches:
+      - ai/dvach-android-build
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build debug APK
+        working-directory: dvach-android
+        run: gradle --no-daemon assembleDebug
+      - name: Prepare artifact
+        run: cp dvach-android/app/build/outputs/apk/debug/app-debug.apk dvach-neo-v0.1.0.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dvach-neo-apk
+          path: dvach-neo-v0.1.0.apk
+          if-no-files-found: error
