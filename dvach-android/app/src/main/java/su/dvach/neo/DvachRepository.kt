@@ -5,15 +5,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.LinkedHashSet
 
-private const val UA = "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36 DvachNeo/0.3"
+private const val UA = "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36 DvachNeo/0.7"
 
 class DvachRepository(context: Context) {
     private val prefs = context.getSharedPreferences("dvach_neo", Context.MODE_PRIVATE)
     private val bases = listOf("https://2ch.su", "https://2ch.org", "https://2ch.life")
+    private val cacheDir = File(context.filesDir, "dvach_json_cache").apply { mkdirs() }
 
     @Volatile
     var activeBase: String = prefs.getString("active_base", bases.first()) ?: bases.first()
@@ -44,52 +46,33 @@ class DvachRepository(context: Context) {
         }
     }
 
+    fun cachedCatalog(board: String): List<ThreadItem> =
+        readCache("catalog_${safe(board)}.json")?.let(::parseCatalog).orEmpty()
+
     suspend fun loadCatalog(board: String): List<ThreadItem> = withContext(Dispatchers.IO) {
-        val root = JSONObject(fetchText("/$board/catalog.json"))
-        val arr = root.optJSONArray("threads") ?: JSONArray()
-        buildList {
-            for (i in 0 until arr.length()) {
-                val o = arr.optJSONObject(i) ?: continue
-                val num = o.longFlexible("num")
-                if (num <= 0L) continue
-                add(
-                    ThreadItem(
-                        num = num,
-                        subject = o.stringFlexible("subject"),
-                        commentHtml = o.stringFlexible("comment"),
-                        postsCount = o.intFlexible("posts_count"),
-                        filesCount = o.intFlexible("files_count"),
-                        views = o.intFlexible("views"),
-                        files = parseFiles(o.optJSONArray("files"))
-                    )
-                )
-            }
+        val file = "catalog_${safe(board)}.json"
+        try {
+            val live = fetchText("/$board/catalog.json")
+            writeCache(file, live)
+            parseCatalog(live)
+        } catch (e: Exception) {
+            val cached = readCache(file)
+            if (!cached.isNullOrBlank()) parseCatalog(cached) else throw e
         }
     }
 
+    fun cachedThread(board: String, thread: Long): List<PostItem> =
+        readCache("thread_${safe(board)}_$thread.json")?.let(::parseThread).orEmpty()
+
     suspend fun loadThread(board: String, thread: Long): List<PostItem> = withContext(Dispatchers.IO) {
-        val root = JSONObject(fetchText("/$board/res/$thread.json"))
-        val threads = root.optJSONArray("threads") ?: JSONArray()
-        val threadObj = threads.optJSONObject(0) ?: return@withContext emptyList()
-        val posts = threadObj.optJSONArray("posts") ?: JSONArray()
-        buildList {
-            for (i in 0 until posts.length()) {
-                val o = posts.optJSONObject(i) ?: continue
-                val num = o.longFlexible("num")
-                if (num <= 0L) continue
-                add(
-                    PostItem(
-                        num = num,
-                        parent = o.longFlexible("parent"),
-                        date = o.stringFlexible("date"),
-                        name = o.stringFlexible("name"),
-                        subject = o.stringFlexible("subject"),
-                        commentHtml = o.stringFlexible("comment"),
-                        op = i == 0 || o.intFlexible("op") == 1,
-                        files = parseFiles(o.optJSONArray("files"))
-                    )
-                )
-            }
+        val file = "thread_${safe(board)}_$thread.json"
+        try {
+            val live = fetchText("/$board/res/$thread.json")
+            writeCache(file, live)
+            parseThread(live)
+        } catch (e: Exception) {
+            val cached = readCache(file)
+            if (!cached.isNullOrBlank()) parseThread(cached) else throw e
         }
     }
 
@@ -122,6 +105,55 @@ class DvachRepository(context: Context) {
         }
     }
 
+    private fun parseCatalog(json: String): List<ThreadItem> {
+        val root = JSONObject(json)
+        val arr = root.optJSONArray("threads") ?: JSONArray()
+        return buildList {
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                val num = o.longFlexible("num")
+                if (num <= 0L) continue
+                add(
+                    ThreadItem(
+                        num = num,
+                        subject = o.stringFlexible("subject"),
+                        commentHtml = o.stringFlexible("comment"),
+                        postsCount = o.intFlexible("posts_count"),
+                        filesCount = o.intFlexible("files_count"),
+                        views = o.intFlexible("views"),
+                        files = parseFiles(o.optJSONArray("files"))
+                    )
+                )
+            }
+        }
+    }
+
+    private fun parseThread(json: String): List<PostItem> {
+        val root = JSONObject(json)
+        val threads = root.optJSONArray("threads") ?: JSONArray()
+        val threadObj = threads.optJSONObject(0) ?: return emptyList()
+        val posts = threadObj.optJSONArray("posts") ?: JSONArray()
+        return buildList {
+            for (i in 0 until posts.length()) {
+                val o = posts.optJSONObject(i) ?: continue
+                val num = o.longFlexible("num")
+                if (num <= 0L) continue
+                add(
+                    PostItem(
+                        num = num,
+                        parent = o.longFlexible("parent"),
+                        date = o.stringFlexible("date"),
+                        name = o.stringFlexible("name"),
+                        subject = o.stringFlexible("subject"),
+                        commentHtml = o.stringFlexible("comment"),
+                        op = i == 0 || o.intFlexible("op") == 1,
+                        files = parseFiles(o.optJSONArray("files"))
+                    )
+                )
+            }
+        }
+    }
+
     private fun parseFiles(arr: JSONArray?): List<MediaItem> {
         if (arr == null) return emptyList()
         return buildList {
@@ -141,6 +173,23 @@ class DvachRepository(context: Context) {
                     )
                 )
             }
+        }
+    }
+
+    private fun safe(value: String): String = value.replace(Regex("[^A-Za-z0-9_.-]"), "_")
+
+    private fun readCache(name: String): String? = runCatching {
+        val file = File(cacheDir, name)
+        if (!file.exists() || file.length() == 0L) null else file.readText(Charsets.UTF_8)
+    }.getOrNull()
+
+    private fun writeCache(name: String, text: String) {
+        runCatching {
+            val file = File(cacheDir, name)
+            val tmp = File(cacheDir, "$name.tmp")
+            tmp.writeText(text, Charsets.UTF_8)
+            if (file.exists()) file.delete()
+            tmp.renameTo(file)
         }
     }
 
