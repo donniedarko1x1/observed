@@ -26,7 +26,7 @@ data class ReadingPosition(
 )
 
 class ThreadReadingStore(context: Context) {
-    private val prefs = context.getSharedPreferences("dvach_reading_v07", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences("dvach_reading_v06", Context.MODE_PRIVATE)
 
     @Synchronized
     fun favoriteThreads(): List<FavoriteThread> {
@@ -86,15 +86,7 @@ class ThreadReadingStore(context: Context) {
             items.removeAt(index)
             false
         } else {
-            items.add(
-                FavoriteThread(
-                    board = board,
-                    thread = thread,
-                    title = title.ifBlank { "Тред №$thread" },
-                    lastRead = 0L,
-                    updatedAt = now
-                )
-            )
+            items.add(FavoriteThread(board, thread, title.ifBlank { "Тред №$thread" }, 0L, now))
             true
         }
         saveFavorites(items)
@@ -117,16 +109,7 @@ class ThreadReadingStore(context: Context) {
     fun markVisited(board: String, thread: Long, title: String, lastPost: Long) {
         val items = recentThreads(limit = 60).toMutableList()
         items.removeAll { it.board == board && it.thread == thread }
-        items.add(
-            0,
-            RecentThread(
-                board = board,
-                thread = thread,
-                title = title.ifBlank { "Тред №$thread" },
-                lastPost = lastPost,
-                visitedAt = System.currentTimeMillis()
-            )
-        )
+        items.add(0, RecentThread(board, thread, title.ifBlank { "Тред №$thread" }, lastPost, System.currentTimeMillis()))
         saveHistory(items.take(40))
     }
 
@@ -162,14 +145,7 @@ class ThreadReadingStore(context: Context) {
     private fun saveFavorites(items: List<FavoriteThread>) {
         val arr = JSONArray()
         items.forEach { item ->
-            arr.put(
-                JSONObject()
-                    .put("board", item.board)
-                    .put("thread", item.thread)
-                    .put("title", item.title)
-                    .put("lastRead", item.lastRead)
-                    .put("updatedAt", item.updatedAt)
-            )
+            arr.put(JSONObject().put("board", item.board).put("thread", item.thread).put("title", item.title).put("lastRead", item.lastRead).put("updatedAt", item.updatedAt))
         }
         prefs.edit().putString("favorites", arr.toString()).apply()
     }
@@ -177,14 +153,7 @@ class ThreadReadingStore(context: Context) {
     private fun saveHistory(items: List<RecentThread>) {
         val arr = JSONArray()
         items.forEach { item ->
-            arr.put(
-                JSONObject()
-                    .put("board", item.board)
-                    .put("thread", item.thread)
-                    .put("title", item.title)
-                    .put("lastPost", item.lastPost)
-                    .put("visitedAt", item.visitedAt)
-            )
+            arr.put(JSONObject().put("board", item.board).put("thread", item.thread).put("title", item.title).put("lastPost", item.lastPost).put("visitedAt", item.visitedAt))
         }
         prefs.edit().putString("history", arr.toString()).apply()
     }
