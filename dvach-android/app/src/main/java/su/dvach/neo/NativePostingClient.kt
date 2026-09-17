@@ -15,7 +15,7 @@ import java.net.URLEncoder
 import java.security.MessageDigest
 import java.util.UUID
 
-private const val POST_UA = "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36 DvachNeo/0.5"
+private const val POST_UA = "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36 DvachNeo/0.7"
 
 data class EmojiCaptchaState(
     val required: Boolean,
@@ -45,9 +45,7 @@ class NativePostingClient(
     suspend fun loadCaptcha(): EmojiCaptchaState = withContext(Dispatchers.IO) {
         val root = getJson("/api/captcha/emoji/id")
         val result = root.optInt("result", 0)
-        if (result != 1) {
-            return@withContext EmojiCaptchaState(required = false)
-        }
+        if (result != 1) return@withContext EmojiCaptchaState(required = false)
 
         val token = root.optString("id")
         if (token.isBlank()) error("Сервер не вернул ID капчи")
@@ -98,10 +96,44 @@ class NativePostingClient(
         comment: String,
         attachments: List<Uri>,
         captcha: EmojiCaptchaState
+    ): NativePostResult = submitPost(
+        board = board,
+        thread = thread,
+        subject = "",
+        comment = comment,
+        attachments = attachments,
+        captcha = captcha
+    )
+
+    suspend fun submitThread(
+        board: String,
+        subject: String,
+        comment: String,
+        attachments: List<Uri>,
+        captcha: EmojiCaptchaState
+    ): NativePostResult = submitPost(
+        board = board,
+        thread = 0L,
+        subject = subject,
+        comment = comment,
+        attachments = attachments,
+        captcha = captcha
+    )
+
+    private suspend fun submitPost(
+        board: String,
+        thread: Long,
+        subject: String,
+        comment: String,
+        attachments: List<Uri>,
+        captcha: EmojiCaptchaState
     ): NativePostResult = withContext(Dispatchers.IO) {
-        if (thread <= 0L) return@withContext NativePostResult(false, message = "Нативный постинг нового треда пока не включён")
-        if (comment.isBlank() && attachments.isEmpty()) return@withContext NativePostResult(false, message = "Введите текст или прикрепите файл")
-        if (captcha.required && !captcha.solved) return@withContext NativePostResult(false, message = "Сначала решите капчу")
+        if (comment.isBlank() && attachments.isEmpty()) {
+            return@withContext NativePostResult(false, message = "Введите текст или прикрепите файл")
+        }
+        if (captcha.required && !captcha.solved) {
+            return@withContext NativePostResult(false, message = "Сначала решите капчу")
+        }
 
         val challenge = solveChallenge(captcha)
         if (captcha.required && captcha.challengeHash.isNotBlank() && challenge == null) {
@@ -111,11 +143,13 @@ class NativePostingClient(
         val fields = linkedMapOf(
             "task" to "post",
             "board" to board,
-            "thread" to thread.toString(),
+            "thread" to thread.coerceAtLeast(0L).toString(),
             "usercode" to "",
             "code" to "",
             "captcha_type" to "emoji_captcha",
             "email" to "",
+            "name" to "",
+            "subject" to subject,
             "comment" to comment
         )
         captcha.solvedKey?.let { fields["emoji_captcha_id"] = it }
@@ -123,11 +157,14 @@ class NativePostingClient(
 
         val root = multipartPost("/user/posting?nc=1", fields, attachments)
         if (root.optInt("result", 0) == 1) {
-            return@withContext NativePostResult(true, root.optLong("num", 0L), "Сообщение отправлено")
+            val number = root.optLong("num", root.optLong("thread", 0L))
+            return@withContext NativePostResult(true, number, if (thread > 0) "Сообщение отправлено" else "Тред создан")
         }
         val error = root.optJSONObject("error")
         val code = error?.optInt("code")
-        val message = error?.optString("message").orEmpty().ifBlank { root.optString("message").ifBlank { "Ошибка отправки" } }
+        val message = error?.optString("message").orEmpty().ifBlank {
+            root.optString("message").ifBlank { "Ошибка отправки" }
+        }
         NativePostResult(false, message = if (code != null) "Ошибка $code: $message" else message)
     }
 
