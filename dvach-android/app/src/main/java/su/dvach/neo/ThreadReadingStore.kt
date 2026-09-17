@@ -12,13 +12,21 @@ data class FavoriteThread(
     val updatedAt: Long
 )
 
+data class RecentThread(
+    val board: String,
+    val thread: Long,
+    val title: String,
+    val lastPost: Long,
+    val visitedAt: Long
+)
+
 data class ReadingPosition(
     val index: Int,
     val offset: Int
 )
 
 class ThreadReadingStore(context: Context) {
-    private val prefs = context.getSharedPreferences("dvach_reading_v06", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences("dvach_reading_v07", Context.MODE_PRIVATE)
 
     @Synchronized
     fun favoriteThreads(): List<FavoriteThread> {
@@ -41,6 +49,29 @@ class ThreadReadingStore(context: Context) {
                 )
             }
         }.sortedByDescending { it.updatedAt }
+    }
+
+    @Synchronized
+    fun recentThreads(limit: Int = 20): List<RecentThread> {
+        val raw = prefs.getString("history", "[]").orEmpty()
+        val arr = runCatching { JSONArray(raw) }.getOrElse { JSONArray() }
+        return buildList {
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                val board = o.optString("board")
+                val thread = o.optLong("thread", 0L)
+                if (board.isBlank() || thread <= 0L) continue
+                add(
+                    RecentThread(
+                        board = board,
+                        thread = thread,
+                        title = o.optString("title").ifBlank { "Тред №$thread" },
+                        lastPost = o.optLong("lastPost", 0L),
+                        visitedAt = o.optLong("visitedAt", 0L)
+                    )
+                )
+            }
+        }.sortedByDescending { it.visitedAt }.take(limit)
     }
 
     fun isFavorite(board: String, thread: Long): Boolean =
@@ -80,6 +111,23 @@ class ThreadReadingStore(context: Context) {
         if (old.title == title) return
         items[index] = old.copy(title = title, updatedAt = System.currentTimeMillis())
         saveFavorites(items)
+    }
+
+    @Synchronized
+    fun markVisited(board: String, thread: Long, title: String, lastPost: Long) {
+        val items = recentThreads(limit = 60).toMutableList()
+        items.removeAll { it.board == board && it.thread == thread }
+        items.add(
+            0,
+            RecentThread(
+                board = board,
+                thread = thread,
+                title = title.ifBlank { "Тред №$thread" },
+                lastPost = lastPost,
+                visitedAt = System.currentTimeMillis()
+            )
+        )
+        saveHistory(items.take(40))
     }
 
     fun loadPosition(board: String, thread: Long): ReadingPosition {
@@ -124,5 +172,20 @@ class ThreadReadingStore(context: Context) {
             )
         }
         prefs.edit().putString("favorites", arr.toString()).apply()
+    }
+
+    private fun saveHistory(items: List<RecentThread>) {
+        val arr = JSONArray()
+        items.forEach { item ->
+            arr.put(
+                JSONObject()
+                    .put("board", item.board)
+                    .put("thread", item.thread)
+                    .put("title", item.title)
+                    .put("lastPost", item.lastPost)
+                    .put("visitedAt", item.visitedAt)
+            )
+        }
+        prefs.edit().putString("history", arr.toString()).apply()
     }
 }
