@@ -1,0 +1,103 @@
+name: Dvach Neo UI Audit
+
+on:
+  push:
+    branches:
+      - ai/dvach-v0.2
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build APK
+        working-directory: dvach-android
+        run: gradle --no-daemon assembleDebug
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          sudo chmod 666 /dev/kvm || true
+      - name: Run app and capture screens
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            mkdir -p audit
+            adb install -r dvach-android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell am force-stop su.dvach.neo
+            adb shell monkey -p su.dvach.neo -c android.intent.category.LAUNCHER 1
+            sleep 8
+            adb shell uiautomator dump /sdcard/boards.xml || true
+            adb pull /sdcard/boards.xml audit/boards.xml || true
+            adb exec-out screencap -p > audit/01-boards.png
+            adb logcat -d -v time > audit/logcat.txt
+            python3 - <<'PY'
+            import xml.etree.ElementTree as ET, re, subprocess
+            p='audit/boards.xml'
+            try:
+              root=ET.parse(p).getroot()
+              candidates=[]
+              for n in root.iter('node'):
+                text=(n.attrib.get('text') or '') + ' ' + (n.attrib.get('content-desc') or '')
+                b=n.attrib.get('bounds','')
+                if any(x.lower() in text.lower() for x in ['бред','/b/','video games','игры']):
+                  m=re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', b)
+                  if m:
+                    x1,y1,x2,y2=map(int,m.groups()); candidates.append(((x1+x2)//2,(y1+y2)//2,text.strip()))
+              print('BOARD_CANDIDATES', candidates)
+              if candidates:
+                x,y,_=candidates[0]
+                subprocess.run(['adb','shell','input','tap',str(x),str(y)], check=False)
+            except Exception as e:
+              print('tap board failed',e)
+            PY
+            sleep 8
+            adb shell uiautomator dump /sdcard/catalog.xml || true
+            adb pull /sdcard/catalog.xml audit/catalog.xml || true
+            adb exec-out screencap -p > audit/02-catalog.png
+            python3 - <<'PY'
+            import xml.etree.ElementTree as ET, re, subprocess
+            try:
+              root=ET.parse('audit/catalog.xml').getroot()
+              nodes=[]
+              for n in root.iter('node'):
+                b=n.attrib.get('bounds',''); txt=n.attrib.get('text','')
+                if n.attrib.get('clickable')=='true' and b:
+                  m=re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', b)
+                  if m:
+                    x1,y1,x2,y2=map(int,m.groups())
+                    if y1>120 and y2-y1>80: nodes.append(((x1+x2)//2,(y1+y2)//2,txt,b))
+              print('CATALOG_CLICKABLES',nodes[:10])
+              if nodes:
+                x,y,_,_=nodes[0]; subprocess.run(['adb','shell','input','tap',str(x),str(y)], check=False)
+            except Exception as e: print('tap thread failed',e)
+            PY
+            sleep 8
+            adb shell uiautomator dump /sdcard/thread.xml || true
+            adb pull /sdcard/thread.xml audit/thread.xml || true
+            adb exec-out screencap -p > audit/03-thread.png
+            adb shell input swipe 540 1750 540 450 500
+            sleep 2
+            adb exec-out screencap -p > audit/04-thread-scrolled.png
+            adb logcat -d -v time > audit/logcat-final.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dvach-ui-audit
+          path: audit
+          if-no-files-found: error
